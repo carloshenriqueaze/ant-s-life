@@ -1,0 +1,1619 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vida de Formiga 3D</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #061009;
+        color: #f4ffe8;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      #game {
+        position: fixed;
+        inset: 0;
+      }
+
+      .hud {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        right: 16px;
+        z-index: 5;
+        display: grid;
+        grid-template-columns: 220px 220px 120px 1fr;
+        gap: 10px;
+        pointer-events: none;
+      }
+
+      .panel {
+        min-height: 58px;
+        padding: 11px 13px;
+        border: 1px solid rgba(230, 255, 210, 0.2);
+        border-radius: 8px;
+        background: rgba(5, 12, 8, 0.72);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(14px);
+      }
+
+      .panel span {
+        display: block;
+        margin-bottom: 7px;
+        color: rgba(232, 249, 222, 0.72);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .panel strong {
+        font-size: 17px;
+      }
+
+      .life-track {
+        height: 12px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .life-fill {
+        height: 100%;
+        width: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #e64b42, #e7d76a, #70d76b);
+      }
+
+      .stamina-fill {
+        height: 100%;
+        width: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #6ec6ff, #d8f27f);
+      }
+
+      .stamina-fill.tired {
+        background: linear-gradient(90deg, #f06b51, #e5c85e);
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        text-align: center;
+        background:
+          radial-gradient(circle at 52% 40%, rgba(255, 236, 156, 0.16), transparent 28%),
+          linear-gradient(rgba(4, 10, 7, 0.24), rgba(4, 10, 7, 0.86));
+      }
+
+      .overlay.hidden {
+        display: none;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        color: #fbfff4;
+        font-size: clamp(48px, 8vw, 104px);
+        line-height: 0.95;
+      }
+
+      .overlay p {
+        max-width: 660px;
+        margin: 18px auto 0;
+        color: rgba(244, 255, 232, 0.84);
+        font-size: 18px;
+        line-height: 1.55;
+      }
+
+      button {
+        min-width: 180px;
+        min-height: 48px;
+        margin-top: 28px;
+        border: 1px solid rgba(245, 255, 227, 0.32);
+        border-radius: 8px;
+        color: #11170d;
+        background: #d8f27f;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 800;
+      }
+
+      button:hover {
+        background: #edf7a6;
+      }
+
+      .controls {
+        position: fixed;
+        left: 18px;
+        bottom: 18px;
+        z-index: 6;
+        display: grid;
+        grid-template-columns: repeat(5, 54px);
+        grid-template-rows: repeat(2, 54px);
+        gap: 8px;
+        pointer-events: auto;
+      }
+
+      .control-button {
+        width: 54px;
+        height: 54px;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        border-radius: 8px;
+        color: #f7ffe9;
+        background: rgba(8, 18, 11, 0.72);
+        border: 1px solid rgba(230, 255, 210, 0.26);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(12px);
+        font-size: 18px;
+      }
+
+      .control-button:active,
+      .control-button.active {
+        color: #11170d;
+        background: #d8f27f;
+      }
+
+      .control-forward {
+        grid-column: 2;
+      }
+
+      .control-left {
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      .control-back {
+        grid-column: 2;
+        grid-row: 2;
+      }
+
+      .control-right {
+        grid-column: 3;
+        grid-row: 2;
+      }
+
+      .control-run {
+        grid-column: 4;
+        grid-row: 2;
+        font-size: 12px;
+      }
+
+      .control-hide {
+        grid-column: 5;
+        grid-row: 2;
+        font-size: 16px;
+      }
+
+      @media (max-width: 720px) {
+        .hud {
+          grid-template-columns: 1fr 1fr;
+          top: 10px;
+          left: 10px;
+          right: 10px;
+        }
+
+        .objective {
+          grid-column: 1 / -1;
+        }
+
+        .controls {
+          left: 10px;
+          bottom: 10px;
+          transform: scale(0.92);
+          transform-origin: bottom left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="game"></main>
+
+    <aside class="hud">
+      <div class="panel">
+        <span>Vida</span>
+        <div class="life-track"><div id="lifeFill" class="life-fill"></div></div>
+      </div>
+      <div class="panel">
+        <span>Fôlego</span>
+        <div class="life-track"><div id="staminaFill" class="stamina-fill"></div></div>
+      </div>
+      <div class="panel">
+        <span>Comida</span>
+        <strong id="foodText">0/12</strong>
+      </div>
+      <div class="panel objective">
+        <span>Objetivo</span>
+        <strong id="objectiveText">Colete 12 migalhas. Use E perto de buracos para se esconder</strong>
+      </div>
+    </aside>
+
+    <nav id="controls" class="controls hidden" aria-label="Controles">
+      <button class="control-button control-forward" data-key="w" title="Andar para frente">W</button>
+      <button class="control-button control-left" data-key="a" title="Virar para esquerda">A</button>
+      <button class="control-button control-back" data-key="s" title="Andar para tras">S</button>
+      <button class="control-button control-right" data-key="d" title="Virar para direita">D</button>
+      <button class="control-button control-run" data-key="shift" title="Correr">RUN</button>
+      <button class="control-button control-hide" data-key="e" title="Entrar ou sair do buraco">E</button>
+    </nav>
+
+    <section id="start" class="overlay">
+      <div>
+        <h1>Vida de Formiga 3D</h1>
+        <p>
+          Um quintal enorme visto da altura de uma formiga. Caminhe pelo mapa,
+          atravesse a grama alta, colete comida, fuja da aranha e dos pássaros.
+          Segure Shift para correr. Use E perto de buracos para se esconder.
+        </p>
+        <button id="startButton">Iniciar jogo</button>
+      </div>
+    </section>
+
+    <section id="gameOver" class="overlay hidden">
+      <div>
+        <h2 id="endTitle">Game Over</h2>
+        <p id="gameOverText">A aranha alcançou a formiga.</p>
+        <button id="restartButton">Reiniciar</button>
+      </div>
+    </section>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+      const container = document.getElementById("game");
+      const startScreen = document.getElementById("start");
+      const gameOver = document.getElementById("gameOver");
+      const controls = document.getElementById("controls");
+      const endTitle = document.getElementById("endTitle");
+      const gameOverText = document.getElementById("gameOverText");
+      const lifeFill = document.getElementById("lifeFill");
+      const staminaFill = document.getElementById("staminaFill");
+      const foodText = document.getElementById("foodText");
+      const objectiveText = document.getElementById("objectiveText");
+
+      const MAP_SIZE = 118000;
+      const HALF = MAP_SIZE / 2;
+      const keys = new Set();
+      const clock = new THREE.Clock();
+      let running = false;
+      let foodCount = 0;
+      let health = 100;
+      let stamina = 100;
+      let exhausted = false;
+      let restHintTimer = 0;
+      let antHeading = Math.PI;
+      let hiddenInHole = false;
+      let hideCooldown = 0;
+      const holes = [];
+      const webs = [];
+      const birds = [];
+      const skyBirds = [];
+      const climbableTrees = [];
+      const treeMissionItems = [];
+      let climbingTree = null;
+      let climbAngle = 0;
+      let climbHeight = 0;
+      let insideTree = false;
+      let mainTree = null;
+      let treeMissionCount = 0;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color("#b8d9ec");
+      scene.fog = new THREE.FogExp2("#b8d9ec", 0.000085);
+
+      const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 70000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      const hemi = new THREE.HemisphereLight("#eaf7ff", "#243719", 1.35);
+      scene.add(hemi);
+
+      const sun = new THREE.DirectionalLight("#fff0b2", 2.6);
+      sun.position.set(1200, 1900, 820);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.left = -1500;
+      sun.shadow.camera.right = 1500;
+      sun.shadow.camera.top = 1500;
+      sun.shadow.camera.bottom = -1500;
+      scene.add(sun);
+
+      const terrainGeometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE, 150, 150);
+      const pos = terrainGeometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const ridgeA = Math.sin(x * 0.00042) * Math.cos(y * 0.00036) * 180;
+        const ridgeB = Math.sin((x + y) * 0.00022) * 260;
+        const macroHill = Math.pow(Math.max(0, Math.sin(x * 0.00018 + 1.4) * Math.sin(y * 0.00016 + 0.8)), 2.0) * 920;
+        const h = Math.sin(x * 0.004) * 10 + Math.cos(y * 0.0032) * 8 + Math.sin((x + y) * 0.0017) * 14 + ridgeA + ridgeB + macroHill;
+        pos.setZ(i, h);
+      }
+      terrainGeometry.computeVertexNormals();
+
+      const terrain = new THREE.Mesh(
+        terrainGeometry,
+        new THREE.MeshStandardMaterial({
+          color: "#354f24",
+          roughness: 0.96,
+          metalness: 0,
+        })
+      );
+      terrain.rotation.x = -Math.PI / 2;
+      terrain.receiveShadow = true;
+      scene.add(terrain);
+
+      const dirtMaterial = new THREE.MeshStandardMaterial({ color: "#4a331f", roughness: 1 });
+      const path = new THREE.Mesh(new THREE.PlaneGeometry(760, 36000, 38, 38), dirtMaterial);
+      path.position.set(-1200, 0.03, 4200);
+      path.rotation.x = -Math.PI / 2;
+      path.rotation.z = -0.2;
+      path.receiveShadow = true;
+      scene.add(path);
+
+      function rand(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      function terrainHeightAt(x, z) {
+        const ridgeA = Math.sin(x * 0.00042) * Math.cos(z * 0.00036) * 180;
+        const ridgeB = Math.sin((x + z) * 0.00022) * 260;
+        const macroHill = Math.pow(Math.max(0, Math.sin(x * 0.00018 + 1.4) * Math.sin(z * 0.00016 + 0.8)), 2.0) * 920;
+        return Math.sin(x * 0.004) * 10 + Math.cos(z * 0.0032) * 8 + Math.sin((x + z) * 0.0017) * 14 + ridgeA + ridgeB + macroHill;
+      }
+
+      function groundInfoAt(x, z) {
+        groundRayOrigin.set(x, 6000, z);
+        groundRaycaster.set(groundRayOrigin, new THREE.Vector3(0, -1, 0));
+        const hit = groundRaycaster.intersectObject(terrain, false)[0];
+        if (hit) {
+          groundNormal.copy(hit.face.normal).transformDirection(terrain.matrixWorld).normalize();
+          return { height: hit.point.y, normal: groundNormal.clone() };
+        }
+        return { height: terrainHeightAt(x, z), normal: new THREE.Vector3(0, 1, 0) };
+      }
+
+      function nearestClimbableTree() {
+        let best = null;
+        let bestDistance = Infinity;
+        for (const tree of climbableTrees) {
+          const distance = Math.hypot(ant.position.x - tree.x, ant.position.z - tree.z);
+          if (distance < bestDistance) {
+            best = tree;
+            bestDistance = distance;
+          }
+        }
+        return best && bestDistance < best.radius + 90 ? best : null;
+      }
+
+      function collidesWithTree(x, z) {
+        for (const tree of climbableTrees) {
+          const distance = Math.hypot(x - tree.x, z - tree.z);
+          if (tree === mainTree && nearMainTreeEntrance()) continue;
+          if (distance < tree.radius + 36) return tree;
+        }
+        return null;
+      }
+
+      function makeAnt() {
+        const ant = new THREE.Group();
+        const body = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({
+          color: "#070707",
+          roughness: 0.2,
+          metalness: 0.42,
+          envMapIntensity: 0.7,
+        });
+        const jointMat = new THREE.MeshStandardMaterial({ color: "#1a1714", roughness: 0.36, metalness: 0.22 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: "#070504", roughness: 0.52, metalness: 0.18 });
+
+        const parts = [
+          [0, 28, -34, 16, 11, 19],
+          [0, 29, -8, 11, 8, 12],
+          [0, 30, 18, 14, 10, 15],
+          [0, 28, 49, 20, 13, 30],
+        ];
+        for (const [x, y, z, sx, sy, sz] of parts) {
+          const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), bodyMat);
+          mesh.position.set(x, y, z);
+          mesh.scale.set(sx, sy, sz);
+          mesh.castShadow = true;
+          body.add(mesh);
+
+          const shine = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 16, 10),
+            new THREE.MeshBasicMaterial({ color: "#fff0a8", transparent: true, opacity: 0.16 })
+          );
+          shine.position.set(x + sx * 0.22, y + sy * 0.42, z - sz * 0.12);
+          shine.scale.set(sx * 0.32, sy * 0.12, sz * 0.18);
+          body.add(shine);
+        }
+
+        for (const z of [-22, 5, 34]) {
+          const joint = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 9, 12), jointMat);
+          joint.position.set(0, 29, z);
+          joint.rotation.x = Math.PI / 2;
+          joint.castShadow = true;
+          body.add(joint);
+        }
+
+        ant.legs = [];
+        for (let side of [-1, 1]) {
+          for (let i = 0; i < 3; i++) {
+            const pivot = new THREE.Group();
+            pivot.position.set(side * 12, 25, -16 + i * 24);
+
+            const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.9, 34, 4, 8), darkMat);
+            upper.rotation.z = side * 1.18;
+            upper.rotation.x = 0.28;
+            upper.position.set(side * 18, -9, 0);
+            upper.castShadow = true;
+            pivot.add(upper);
+
+            const lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.75, 42, 4, 8), darkMat);
+            lower.rotation.z = side * 0.8;
+            lower.rotation.x = -0.2;
+            lower.position.set(side * 43, -25, side * 2);
+            lower.castShadow = true;
+            pivot.add(lower);
+
+            const foot = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 6), darkMat);
+            foot.position.set(side * 63, -48, 0);
+            foot.scale.set(1.8, 0.7, 0.9);
+            foot.castShadow = true;
+            pivot.add(foot);
+
+            pivot.userData = { side, phase: i * 0.8 + (side > 0 ? Math.PI : 0) };
+            ant.legs.push(pivot);
+            body.add(pivot);
+          }
+        }
+
+        const eyeMat = new THREE.MeshStandardMaterial({ color: "#050505", roughness: 0.12, metalness: 0.2 });
+        for (let side of [-1, 1]) {
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(3.2, 12, 8), eyeMat);
+          eye.position.set(side * 10, 35, -47);
+          eye.scale.set(1, 0.8, 1.25);
+          eye.castShadow = true;
+          body.add(eye);
+        }
+
+        const hairMat = new THREE.MeshBasicMaterial({ color: "#1d1a16" });
+        for (let i = 0; i < 42; i++) {
+          const hair = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, rand(8, 16), 3, 4), hairMat);
+          hair.position.set(rand(-12, 12), rand(36, 47), rand(-46, 70));
+          hair.rotation.set(rand(-0.7, 0.7), rand(0, Math.PI), rand(-0.7, 0.7));
+          body.add(hair);
+        }
+
+        for (let side of [-1, 1]) {
+          const antenna = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 58, 5, 8), darkMat);
+          antenna.position.set(side * 14, 39, -56);
+          antenna.rotation.set(0.78, side * 0.52, side * 0.52);
+          body.add(antenna);
+        }
+
+        for (let side of [-1, 1]) {
+          const mandible = new THREE.Mesh(new THREE.CapsuleGeometry(0.9, 20, 4, 8), darkMat);
+          mandible.position.set(side * 8, 22, -52);
+          mandible.rotation.set(1.15, side * 0.25, side * 0.42);
+          mandible.castShadow = true;
+          body.add(mandible);
+        }
+
+        const shadow = new THREE.Mesh(
+          new THREE.CircleGeometry(54, 36),
+          new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.28, depthWrite: false })
+        );
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.position.y = 1.2;
+        shadow.scale.set(1.15, 0.56, 1);
+        ant.add(shadow);
+
+        ant.add(body);
+        ant.body = body;
+        ant.realLegs = [];
+        ant.realLegRig = new THREE.Group();
+        ant.realLegRig.visible = false;
+        const animatedLegMat = new THREE.MeshStandardMaterial({
+          color: "#140804",
+          roughness: 0.34,
+          metalness: 0.28,
+        });
+        for (let side of [-1, 1]) {
+          for (let i = 0; i < 3; i++) {
+            const pivot = new THREE.Group();
+            pivot.position.set(side * 10, 22, -28 + i * 28);
+
+            const hip = new THREE.Mesh(new THREE.SphereGeometry(2.1, 8, 6), animatedLegMat);
+            hip.position.set(side * 4, 0, 0);
+            hip.castShadow = true;
+            pivot.add(hip);
+
+            const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.7, 34, 4, 8), animatedLegMat);
+            upper.position.set(side * 18, -9, 0);
+            upper.rotation.z = side * 1.08;
+            upper.rotation.x = 0.22;
+            upper.castShadow = true;
+            pivot.add(upper);
+
+            const knee = new THREE.Mesh(new THREE.SphereGeometry(1.7, 8, 6), animatedLegMat);
+            knee.position.set(side * 35, -24, 0);
+            knee.castShadow = true;
+            pivot.add(knee);
+
+            const lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 44, 4, 8), animatedLegMat);
+            lower.position.set(side * 55, -39, 0);
+            lower.rotation.z = side * 0.82;
+            lower.rotation.x = -0.15;
+            lower.castShadow = true;
+            pivot.add(lower);
+
+            const foot = new THREE.Mesh(new THREE.SphereGeometry(1.35, 8, 6), animatedLegMat);
+            foot.position.set(side * 78, -61, 0);
+            foot.scale.set(2.7, 0.55, 0.9);
+            foot.castShadow = true;
+            pivot.add(foot);
+
+            pivot.userData = {
+              side,
+              baseY: pivot.position.y,
+              baseZ: pivot.position.z,
+              upper,
+              lower,
+              knee,
+              foot,
+              phase: i * 1.05 + (side > 0 ? Math.PI : 0),
+            };
+            ant.realLegs.push(pivot);
+            ant.realLegRig.add(pivot);
+          }
+        }
+        ant.add(ant.realLegRig);
+        ant.scale.setScalar(1.42);
+        ant.position.set(0, 8, 0);
+        return ant;
+      }
+
+      function makeSpider() {
+        const spider = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: "#1b1111", roughness: 0.68 });
+        const eyeMat = new THREE.MeshStandardMaterial({ color: "#dd4d34", emissive: "#7a1008", emissiveIntensity: 1 });
+
+        const abdomen = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 16), mat);
+        abdomen.scale.set(25, 15, 32);
+        abdomen.position.z = 18;
+        abdomen.castShadow = true;
+        spider.add(abdomen);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), mat);
+        head.scale.set(18, 13, 18);
+        head.position.z = -20;
+        head.castShadow = true;
+        spider.add(head);
+
+        for (let side of [-1, 1]) {
+          for (let i = 0; i < 4; i++) {
+            const leg = new THREE.Mesh(new THREE.CapsuleGeometry(1.6, 62, 4, 8), mat);
+            leg.position.set(side * 28, 8, -24 + i * 16);
+            leg.rotation.set(0.3, 0, side * 1.12);
+            leg.castShadow = true;
+            spider.add(leg);
+          }
+        }
+
+        for (let side of [-1, 1]) {
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(2.8, 10, 8), eyeMat);
+          eye.position.set(side * 6, 12, -36);
+          spider.add(eye);
+        }
+
+        spider.position.set(520, 0, -520);
+        return spider;
+      }
+
+      const ant = makeAnt();
+      const spider = makeSpider();
+      scene.add(ant, spider);
+
+      const loader = new GLTFLoader();
+      loader.load(
+        "./assets/formiga_nova/scene.gltf",
+        (gltf) => {
+          const model = gltf.scene;
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              if (child.material) {
+                child.material.roughness = Math.min(child.material.roughness ?? 0.45, 0.36);
+                child.material.metalness = Math.max(child.material.metalness ?? 0.08, 0.28);
+                child.material = addAntMotionShader(child.material);
+              }
+            }
+          });
+
+          const box = new THREE.Box3().setFromObject(model);
+          const size = new THREE.Vector3();
+          const center = new THREE.Vector3();
+          box.getSize(size);
+          box.getCenter(center);
+          model.position.sub(center);
+          const largest = Math.max(size.x, size.y, size.z) || 1;
+          model.scale.setScalar(120 / largest);
+          model.rotation.y = Math.PI / 2;
+          model.userData.baseScale = model.scale.clone();
+          model.userData.baseRotation = model.rotation.clone();
+
+          ant.body.visible = false;
+          ant.realLegRig.visible = false;
+          ant.realLegRig.rotation.y = model.rotation.y;
+          ant.add(model);
+          ant.realModel = model;
+        },
+        undefined,
+        (error) => {
+          console.warn("Nao foi possivel carregar o modelo real da formiga.", error);
+        }
+      );
+
+      const food = [];
+      const foodMat = new THREE.MeshStandardMaterial({ color: "#ddb75d", roughness: 0.82, emissive: "#5a3608", emissiveIntensity: 0.18 });
+      for (let i = 0; i < 12; i++) {
+        const crumb = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(10, 18), 0), foodMat);
+        crumb.position.set(rand(-18000, 18000), 13, rand(-18000, 18000));
+        crumb.castShadow = true;
+        crumb.userData.collected = false;
+        food.push(crumb);
+        scene.add(crumb);
+      }
+
+      const home = new THREE.Mesh(
+        new THREE.CylinderGeometry(75, 100, 10, 42),
+        new THREE.MeshStandardMaterial({ color: "#090604", roughness: 1 })
+      );
+      home.position.set(0, 2, 22000);
+      home.receiveShadow = true;
+      scene.add(home);
+
+      function makeHole(x, z, radius = 110) {
+        const group = new THREE.Group();
+        const rim = new THREE.Mesh(
+          new THREE.TorusGeometry(radius, 9, 10, 48),
+          new THREE.MeshStandardMaterial({ color: "#3b2819", roughness: 1 })
+        );
+        rim.rotation.x = Math.PI / 2;
+        rim.receiveShadow = true;
+        group.add(rim);
+
+        const dark = new THREE.Mesh(
+          new THREE.CircleGeometry(radius * 0.86, 44),
+          new THREE.MeshBasicMaterial({ color: "#020201" })
+        );
+        dark.rotation.x = -Math.PI / 2;
+        dark.position.y = 1;
+        group.add(dark);
+
+        group.position.set(x, 1, z);
+        scene.add(group);
+        holes.push({ group, position: new THREE.Vector3(x, 0, z), radius });
+      }
+
+      makeHole(0, 22000, 160);
+      for (let i = 0; i < 34; i++) makeHole(rand(-48000, 48000), rand(-48000, 48000), rand(90, 190));
+
+      const grassBlade = new THREE.PlaneGeometry(13, 150, 1, 4);
+      const grassPos = grassBlade.attributes.position;
+      for (let i = 0; i < grassPos.count; i++) {
+        const y = grassPos.getY(i);
+        const bend = Math.pow((y + 75) / 150, 1.7) * 26;
+        grassPos.setX(i, grassPos.getX(i) + bend);
+      }
+      grassBlade.translate(0, 75, 0);
+      grassBlade.computeVertexNormals();
+      const grassMat = new THREE.MeshStandardMaterial({
+        color: "#5d8835",
+        roughness: 0.88,
+        side: THREE.DoubleSide,
+      });
+      const grass = new THREE.InstancedMesh(grassBlade, grassMat, 13500);
+      grass.castShadow = true;
+      grass.receiveShadow = true;
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < grass.count; i++) {
+        dummy.position.set(rand(-HALF, HALF), 0, rand(-HALF, HALF));
+        dummy.rotation.set(rand(-0.08, 0.18), rand(0, Math.PI), rand(-0.18, 0.18));
+        const s = rand(0.55, 3.8);
+        dummy.scale.set(rand(0.45, 1.35), s, 1);
+        dummy.updateMatrix();
+        grass.setMatrixAt(i, dummy.matrix);
+      }
+      scene.add(grass);
+
+      const grassEdgeMat = new THREE.MeshBasicMaterial({ color: "#2a4d24", transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false });
+      for (let i = 0; i < 26; i++) {
+        const curtain = new THREE.Mesh(new THREE.PlaneGeometry(rand(220, 520), rand(340, 740)), grassEdgeMat);
+        curtain.position.set(rand(-3200, 3200), rand(70, 180), rand(-3200, 3200));
+        curtain.rotation.set(rand(-0.1, 0.15), rand(0, Math.PI), rand(-0.12, 0.12));
+        scene.add(curtain);
+      }
+
+      function makeWeb(x, z, scale = 1) {
+        const group = new THREE.Group();
+        const webMat = new THREE.MeshBasicMaterial({ color: "#dff6ff", transparent: true, opacity: 0.42, side: THREE.DoubleSide });
+        for (let i = 0; i < 7; i++) {
+          const strand = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 170 * scale, 6), webMat);
+          strand.rotation.z = (i / 7) * Math.PI;
+          strand.position.y = 28 * scale;
+          group.add(strand);
+        }
+        for (let r = 0; r < 4; r++) {
+          const ring = new THREE.Mesh(new THREE.TorusGeometry((24 + r * 23) * scale, 1.1, 6, 48), webMat);
+          ring.position.y = 28 * scale;
+          ring.rotation.x = Math.PI / 2;
+          group.add(ring);
+        }
+        group.position.set(x, 5, z);
+        group.rotation.y = rand(0, Math.PI);
+        scene.add(group);
+        webs.push({ group, position: new THREE.Vector3(x, 0, z), radius: 110 * scale });
+      }
+
+      for (let i = 0; i < 60; i++) makeWeb(rand(-52000, 52000), rand(-52000, 52000), rand(0.8, 2.2));
+
+      const rockMat = new THREE.MeshStandardMaterial({ color: "#706e65", roughness: 0.96 });
+      for (let i = 0; i < 260; i++) {
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(18, 58), 1), rockMat);
+        rock.position.set(rand(-56000, 56000), rand(9, 26), rand(-56000, 56000));
+        rock.scale.y = rand(0.22, 0.5);
+        rock.rotation.set(rand(0, 1), rand(0, Math.PI), rand(0, 1));
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        scene.add(rock);
+      }
+
+      const leafMat = new THREE.MeshStandardMaterial({ color: "#896c2d", roughness: 0.9, side: THREE.DoubleSide });
+      for (let i = 0; i < 180; i++) {
+        const leaf = new THREE.Mesh(new THREE.CircleGeometry(rand(34, 82), 28), leafMat.clone());
+        leaf.material.color.set(Math.random() > 0.5 ? "#8b6b2e" : "#72823b");
+        leaf.position.set(rand(-56000, 56000), 3, rand(-56000, 56000));
+        leaf.scale.set(rand(1.8, 4.6), rand(0.42, 0.86), 1);
+        leaf.rotation.set(-Math.PI / 2, 0, rand(0, Math.PI));
+        leaf.receiveShadow = true;
+        scene.add(leaf);
+      }
+
+      const waterMat = new THREE.MeshPhysicalMaterial({
+        color: "#9fd7ea",
+        roughness: 0.02,
+        metalness: 0,
+        transmission: 0.35,
+        transparent: true,
+        opacity: 0.55,
+      });
+      for (let i = 0; i < 90; i++) {
+        const drop = new THREE.Mesh(new THREE.SphereGeometry(rand(18, 34), 24, 14), waterMat);
+        drop.position.set(rand(-54000, 54000), 20, rand(-54000, 54000));
+        drop.scale.y = 0.45;
+        drop.castShadow = true;
+        scene.add(drop);
+      }
+
+      const surrealObjects = [];
+
+      function makeBird(index) {
+        const bird = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: index % 2 ? "#25251f" : "#3a372c", roughness: 0.58 });
+        const body = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), mat);
+        body.scale.set(42, 18, 24);
+        body.castShadow = true;
+        bird.add(body);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(15, 14, 10), mat);
+        head.position.set(40, 5, 0);
+        head.castShadow = true;
+        bird.add(head);
+
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(8, 28, 4), new THREE.MeshStandardMaterial({ color: "#c9a35a", roughness: 0.7 }));
+        beak.position.set(62, 4, 0);
+        beak.rotation.z = -Math.PI / 2;
+        bird.add(beak);
+
+        const wingGeo = new THREE.PlaneGeometry(92, 30, 1, 1);
+        const wingMat = new THREE.MeshStandardMaterial({ color: "#1f211d", roughness: 0.7, side: THREE.DoubleSide });
+        const left = new THREE.Mesh(wingGeo, wingMat);
+        const right = new THREE.Mesh(wingGeo, wingMat);
+        left.position.set(-10, 0, -31);
+        right.position.set(-10, 0, 31);
+        left.rotation.y = 0.45;
+        right.rotation.y = -0.45;
+        bird.add(left, right);
+        bird.userData = {
+          center: new THREE.Vector3(rand(-38000, 38000), 620 + index * 120, rand(-38000, 38000)),
+          radius: rand(2200, 5400),
+          speed: rand(0.18, 0.34),
+          phase: rand(0, Math.PI * 2),
+          left,
+          right,
+          strikeCooldown: 0,
+        };
+        scene.add(bird);
+        birds.push(bird);
+      }
+
+      for (let i = 0; i < 5; i++) makeBird(i);
+
+      function makeSkyBird(index) {
+        const bird = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({
+          color: index % 2 ? "#20231f" : "#343227",
+          roughness: 0.68,
+          side: THREE.DoubleSide,
+        });
+
+        const body = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 8), bodyMat);
+        body.scale.set(34, 10, 12);
+        body.castShadow = true;
+        bird.add(body);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(8, 10, 8), bodyMat);
+        head.position.set(31, 2, 0);
+        bird.add(head);
+
+        const wingGeo = new THREE.PlaneGeometry(150, 38, 3, 1);
+        const wingMat = new THREE.MeshStandardMaterial({
+          color: "#171914",
+          roughness: 0.7,
+          side: THREE.DoubleSide,
+        });
+        const leftWing = new THREE.Mesh(wingGeo, wingMat);
+        const rightWing = new THREE.Mesh(wingGeo, wingMat);
+        leftWing.position.set(-10, 0, -34);
+        rightWing.position.set(-10, 0, 34);
+        leftWing.rotation.y = 0.36;
+        rightWing.rotation.y = -0.36;
+        bird.add(leftWing, rightWing);
+
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(13, 36, 3), bodyMat);
+        tail.position.set(-45, 0, 0);
+        tail.rotation.z = Math.PI / 2;
+        bird.add(tail);
+
+        bird.userData = {
+          center: new THREE.Vector3(rand(-26000, 26000), rand(2200, 4200), rand(-26000, 26000)),
+          radiusX: rand(8000, 18000),
+          radiusZ: rand(6000, 15000),
+          speed: rand(0.08, 0.18),
+          phase: rand(0, Math.PI * 2),
+          leftWing,
+          rightWing,
+        };
+        scene.add(bird);
+        skyBirds.push(bird);
+      }
+
+      for (let i = 0; i < 10; i++) makeSkyBird(i);
+
+      function makeGiantTree(x, z, scale = 1) {
+        const group = new THREE.Group();
+        const barkMat = new THREE.MeshStandardMaterial({ color: "#5b3a21", roughness: 0.92 });
+        const leafMat = new THREE.MeshStandardMaterial({ color: "#315f2d", roughness: 0.86 });
+
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(150 * scale, 260 * scale, 2600 * scale, 22), barkMat);
+        trunk.position.y = 1300 * scale;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+        group.add(trunk);
+
+        for (let i = 0; i < 7; i++) {
+          const branch = new THREE.Mesh(new THREE.CylinderGeometry(28 * scale, 70 * scale, 900 * scale, 12), barkMat);
+          const a = (i / 7) * Math.PI * 2;
+          branch.position.set(Math.cos(a) * 260 * scale, (1750 + i * 70) * scale, Math.sin(a) * 260 * scale);
+          branch.rotation.z = Math.PI / 2.8;
+          branch.rotation.y = -a;
+          branch.castShadow = true;
+          group.add(branch);
+        }
+
+        for (let i = 0; i < 8; i++) {
+          const root = new THREE.Mesh(new THREE.CylinderGeometry(18 * scale, 46 * scale, 760 * scale, 12), barkMat);
+          const a = (i / 8) * Math.PI * 2;
+          root.position.set(Math.cos(a) * 430 * scale, 42 * scale, Math.sin(a) * 430 * scale);
+          root.rotation.z = Math.PI / 2.25;
+          root.rotation.y = -a;
+          root.scale.y = rand(0.75, 1.25);
+          root.castShadow = true;
+          root.receiveShadow = true;
+          group.add(root);
+        }
+
+        const vineMat = new THREE.MeshStandardMaterial({ color: "#29491f", roughness: 0.86 });
+        const vinePoints = [];
+        for (let i = 0; i <= 72; i++) {
+          const t = i / 72;
+          const a = t * Math.PI * 7;
+          vinePoints.push(new THREE.Vector3(Math.cos(a) * 270 * scale, t * 2100 * scale + 80 * scale, Math.sin(a) * 270 * scale));
+        }
+        const vine = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(vinePoints), 120, 8 * scale, 8, false), vineMat);
+        vine.castShadow = true;
+        group.add(vine);
+
+        for (let i = 0; i < 9; i++) {
+          const crown = new THREE.Mesh(new THREE.SphereGeometry(rand(380, 720) * scale, 20, 14), leafMat);
+          crown.position.set(rand(-580, 580) * scale, rand(2450, 3400) * scale, rand(-580, 580) * scale);
+          crown.scale.y = rand(0.55, 0.95);
+          crown.castShadow = true;
+          group.add(crown);
+        }
+
+        group.position.set(x, 0, z);
+        group.rotation.y = rand(0, Math.PI);
+        scene.add(group);
+        climbableTrees.push({ x, z, radius: 260 * scale, height: 2100 * scale, scale, group });
+      }
+
+      function makeMainTree() {
+        const x = 900;
+        const z = 1450;
+        const scale = 2.55;
+        const group = new THREE.Group();
+        const barkMat = new THREE.MeshStandardMaterial({ color: "#5a3620", roughness: 0.96 });
+        const darkMat = new THREE.MeshBasicMaterial({ color: "#070402" });
+        const amberMat = new THREE.MeshStandardMaterial({ color: "#d59b43", roughness: 0.64, emissive: "#5c3204", emissiveIntensity: 0.22 });
+        const mossMat = new THREE.MeshStandardMaterial({ color: "#2f5f29", roughness: 0.92 });
+
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(390 * scale, 560 * scale, 4200 * scale, 36), barkMat);
+        trunk.position.y = 2100 * scale;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const entrance = new THREE.Mesh(new THREE.CircleGeometry(360 * scale, 42), darkMat);
+        entrance.position.set(0, 360 * scale, -562 * scale);
+        entrance.rotation.y = Math.PI;
+        group.add(entrance);
+
+        for (let i = 0; i < 13; i++) {
+          const root = new THREE.Mesh(new THREE.CylinderGeometry(34 * scale, 95 * scale, 1050 * scale, 12), barkMat);
+          const a = (i / 13) * Math.PI * 2;
+          root.position.set(Math.cos(a) * 820 * scale, 56 * scale, Math.sin(a) * 820 * scale);
+          root.rotation.z = Math.PI / 2.35;
+          root.rotation.y = -a;
+          root.castShadow = true;
+          root.receiveShadow = true;
+          group.add(root);
+        }
+
+        const innerPathPoints = [];
+        for (let i = 0; i <= 150; i++) {
+          const t = i / 150;
+          const a = t * Math.PI * 7.5 - Math.PI / 2;
+          innerPathPoints.push(new THREE.Vector3(Math.cos(a) * 455 * scale, (260 + t * 3200) * scale, Math.sin(a) * 455 * scale));
+        }
+        const innerPath = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(innerPathPoints), 180, 42 * scale, 12, false), mossMat);
+        innerPath.castShadow = true;
+        innerPath.receiveShadow = true;
+        group.add(innerPath);
+
+        for (let i = 0; i < 8; i++) {
+          const t = i / 7;
+          const a = t * Math.PI * 7.5 - Math.PI / 2;
+          const platform = new THREE.Mesh(new THREE.CylinderGeometry(210 * scale, 240 * scale, 30 * scale, 18), barkMat);
+          platform.position.set(Math.cos(a) * 455 * scale, (360 + t * 3100) * scale, Math.sin(a) * 455 * scale);
+          platform.scale.z = 0.45;
+          platform.rotation.y = -a;
+          platform.castShadow = true;
+          platform.receiveShadow = true;
+          group.add(platform);
+        }
+
+        for (let i = 0; i < 5; i++) {
+          const t = (i + 0.7) / 5.8;
+          const a = t * Math.PI * 7.5 - Math.PI / 2;
+          const sap = new THREE.Mesh(new THREE.DodecahedronGeometry(55 * scale, 0), amberMat);
+          sap.position.set(Math.cos(a) * 455 * scale, (360 + t * 3100) * scale + 72, Math.sin(a) * 455 * scale);
+          sap.castShadow = true;
+          sap.userData.collected = false;
+          group.add(sap);
+          treeMissionItems.push({ mesh: sap, world: new THREE.Vector3(), collected: false });
+        }
+
+        const leafMat = new THREE.MeshStandardMaterial({ color: "#244f23", roughness: 0.82 });
+        for (let i = 0; i < 18; i++) {
+          const crown = new THREE.Mesh(new THREE.SphereGeometry(rand(820, 1500) * scale, 22, 14), leafMat);
+          crown.position.set(rand(-1250, 1250) * scale, rand(4300, 6200) * scale, rand(-1250, 1250) * scale);
+          crown.scale.y = rand(0.48, 0.82);
+          crown.castShadow = true;
+          group.add(crown);
+        }
+
+        group.position.set(x, 0, z);
+        scene.add(group);
+        mainTree = { x, z, radius: 560 * scale, height: 3650 * scale, scale, group, innerRadius: 455 * scale };
+        climbableTrees.push(mainTree);
+      }
+
+      for (let i = 0; i < 70; i++) makeGiantTree(rand(-56000, 56000), rand(-56000, 56000), rand(0.65, 1.8));
+      makeMainTree();
+
+      const mountainMat = new THREE.MeshStandardMaterial({ color: "#526548", roughness: 0.98 });
+      for (let i = 0; i < 34; i++) {
+        const mountain = new THREE.Mesh(new THREE.ConeGeometry(rand(900, 2300), rand(900, 2800), 7), mountainMat);
+        mountain.position.set(rand(-57000, 57000), mountain.geometry.parameters.height / 2 - 40, rand(-57000, 57000));
+        mountain.scale.y = rand(0.55, 1.4);
+        mountain.rotation.y = rand(0, Math.PI);
+        mountain.castShadow = true;
+        mountain.receiveShadow = true;
+        scene.add(mountain);
+      }
+
+      function makeMushroom(x, z, scale) {
+        const group = new THREE.Group();
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(13 * scale, 20 * scale, 130 * scale, 18),
+          new THREE.MeshStandardMaterial({ color: "#d9c7a8", roughness: 0.8 })
+        );
+        stem.position.y = 65 * scale;
+        stem.castShadow = true;
+        group.add(stem);
+
+        const cap = new THREE.Mesh(
+          new THREE.SphereGeometry(58 * scale, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.52),
+          new THREE.MeshStandardMaterial({ color: "#9c2f35", roughness: 0.62 })
+        );
+        cap.position.y = 132 * scale;
+        cap.scale.y = 0.46;
+        cap.castShadow = true;
+        group.add(cap);
+
+        const glow = new THREE.PointLight("#e6f3a0", 0.65 * scale, 260 * scale);
+        glow.position.y = 110 * scale;
+        group.add(glow);
+
+        group.position.set(x, 0, z);
+        scene.add(group);
+        surrealObjects.push(group);
+      }
+
+      function makeFlower(x, z, scale, color) {
+        const group = new THREE.Group();
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(8 * scale, 12 * scale, 520 * scale, 14),
+          new THREE.MeshStandardMaterial({ color: "#476d30", roughness: 0.78 })
+        );
+        stem.position.y = 260 * scale;
+        stem.rotation.z = rand(-0.12, 0.12);
+        stem.castShadow = true;
+        group.add(stem);
+
+        const petalMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, side: THREE.DoubleSide });
+        for (let i = 0; i < 7; i++) {
+          const petal = new THREE.Mesh(new THREE.CircleGeometry(56 * scale, 24), petalMat);
+          const a = (i / 7) * Math.PI * 2;
+          petal.position.set(Math.cos(a) * 55 * scale, 526 * scale + Math.sin(i) * 8, Math.sin(a) * 55 * scale);
+          petal.scale.set(1.2, 0.55, 1);
+          petal.rotation.set(Math.PI / 2.2, 0, a);
+          petal.castShadow = true;
+          group.add(petal);
+        }
+
+        const center = new THREE.Mesh(
+          new THREE.SphereGeometry(35 * scale, 18, 14),
+          new THREE.MeshStandardMaterial({ color: "#e4c85a", emissive: "#6e4d04", emissiveIntensity: 0.25 })
+        );
+        center.position.y = 526 * scale;
+        center.castShadow = true;
+        group.add(center);
+
+        group.position.set(x, 0, z);
+        scene.add(group);
+        surrealObjects.push(group);
+      }
+
+      for (let i = 0; i < 80; i++) makeMushroom(rand(-52000, 52000), rand(-52000, 52000), rand(0.9, 2.8));
+      for (let i = 0; i < 42; i++) makeFlower(rand(-52000, 52000), rand(-52000, 52000), rand(0.7, 1.7), Math.random() > 0.5 ? "#d8698d" : "#b9d35c");
+
+      const moteMat = new THREE.MeshBasicMaterial({ color: "#fff3a8", transparent: true, opacity: 0.82 });
+      const motes = [];
+      for (let i = 0; i < 120; i++) {
+        const mote = new THREE.Mesh(new THREE.SphereGeometry(rand(2, 6), 8, 6), moteMat);
+        mote.position.set(rand(-8000, 8000), rand(70, 720), rand(-8000, 8000));
+        mote.userData = { baseY: mote.position.y, phase: rand(0, Math.PI * 2) };
+        motes.push(mote);
+        scene.add(mote);
+      }
+
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: "#fff0b0",
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      for (let i = 0; i < 9; i++) {
+        const beam = new THREE.Mesh(new THREE.PlaneGeometry(rand(110, 230), rand(850, 1500)), beamMat);
+        beam.position.set(rand(-9000, 9000), rand(520, 1200), rand(-9000, 9000));
+        beam.rotation.set(rand(0.6, 0.9), rand(-0.55, 0.55), rand(-0.35, 0.35));
+        scene.add(beam);
+      }
+
+      const velocity = new THREE.Vector3();
+      const desired = new THREE.Vector3();
+      const camTarget = new THREE.Vector3();
+      const camPos = new THREE.Vector3();
+      const groundRaycaster = new THREE.Raycaster();
+      const groundRayOrigin = new THREE.Vector3();
+      const groundNormal = new THREE.Vector3(0, 1, 0);
+      const antMotionUniforms = [];
+
+      function addAntMotionShader(material) {
+        const clone = material.clone();
+        clone.onBeforeCompile = (shader) => {
+          shader.uniforms.uAntTime = { value: 0 };
+          shader.uniforms.uAntMove = { value: 0 };
+          antMotionUniforms.push(shader.uniforms);
+          shader.vertexShader = `
+            uniform float uAntTime;
+            uniform float uAntMove;
+          ` + shader.vertexShader;
+          shader.vertexShader = shader.vertexShader.replace(
+            "#include <begin_vertex>",
+            `
+              #include <begin_vertex>
+              float lateral = abs(position.y);
+              float side = position.y >= 0.0 ? 1.0 : -1.0;
+              float legRootMask = smoothstep(0.24, 0.42, lateral) * (1.0 - smoothstep(0.52, 0.66, lateral));
+              float legTipMask = smoothstep(0.42, 0.70, lateral);
+              float antennaMask = smoothstep(0.18, 0.48, -position.x) * smoothstep(0.18, 0.50, lateral);
+              float abdomenMask = smoothstep(0.22, 0.56, position.x) * (1.0 - smoothstep(0.18, 0.38, lateral));
+              float frontMask = 1.0 - smoothstep(-0.30, -0.08, position.x);
+              float midMask = smoothstep(-0.26, -0.02, position.x) * (1.0 - smoothstep(0.02, 0.26, position.x));
+              float backMask = smoothstep(0.08, 0.34, position.x);
+              float frontPhase = side > 0.0 ? 0.0 : 3.14159;
+              float midPhase = side > 0.0 ? 3.14159 : 0.0;
+              float backPhase = side > 0.0 ? 0.0 : 3.14159;
+              float phase = frontMask * frontPhase + midMask * midPhase + backMask * backPhase;
+              float legRegion = max(frontMask, max(midMask, backMask));
+              float cycle = sin(uAntTime * 18.0 + phase);
+              float lift = pow(max(0.0, cycle), 0.42);
+              float push = cos(uAntTime * 18.0 + phase);
+              transformed.y += side * push * legTipMask * legRegion * uAntMove * 0.062;
+              transformed.z += lift * legTipMask * legRegion * uAntMove * 0.220;
+              transformed.z += lift * legRootMask * legRegion * uAntMove * 0.028;
+              transformed.x += push * legTipMask * legRegion * uAntMove * 0.055;
+              transformed.y += sin(uAntTime * 7.0 + side * 1.4) * antennaMask * 0.020;
+              transformed.z += cos(uAntTime * 6.0 + side * 1.4) * antennaMask * 0.010;
+              transformed.z += sin(uAntTime * 6.0) * abdomenMask * uAntMove * 0.0035;
+            `
+          );
+        };
+        clone.needsUpdate = true;
+        return clone;
+      }
+      function resetGame() {
+        running = true;
+        health = 100;
+        stamina = 100;
+        exhausted = false;
+        hiddenInHole = false;
+        insideTree = false;
+        treeMissionCount = 0;
+        hideCooldown = 0;
+        restHintTimer = 0;
+        foodCount = 0;
+        ant.position.set(0, 0, 0);
+        ant.position.y = groundInfoAt(0, 0).height + 24;
+        antHeading = Math.PI;
+        ant.rotation.y = antHeading;
+        climbingTree = null;
+        climbAngle = 0;
+        climbHeight = 0;
+        spider.position.set(520, 0, -520);
+        for (const item of treeMissionItems) {
+          item.collected = false;
+          item.mesh.visible = true;
+        }
+        for (const crumb of food) {
+          crumb.visible = true;
+          crumb.userData.collected = false;
+          crumb.position.set(rand(-18000, 18000), 13, rand(-18000, 18000));
+        }
+        startScreen.classList.add("hidden");
+        gameOver.classList.add("hidden");
+        controls.classList.remove("hidden");
+        objectiveText.textContent = "Encontre a árvore enorme perto do início. Use E para entrar ou escalar";
+        updateHud();
+      }
+
+      function finish(win) {
+        running = false;
+        endTitle.textContent = win ? "Missao Completa" : "Game Over";
+        gameOverText.textContent = win
+          ? "A formiga voltou ao formigueiro com comida suficiente."
+          : "A aranha alcançou a formiga.";
+        gameOver.classList.remove("hidden");
+        controls.classList.add("hidden");
+        hiddenInHole = false;
+      }
+
+      function updateHud() {
+        lifeFill.style.width = `${Math.max(0, health)}%`;
+        staminaFill.style.width = `${Math.max(0, stamina)}%`;
+        staminaFill.classList.toggle("tired", exhausted);
+        foodText.textContent = `${foodCount}/12`;
+      }
+
+      function nearestHoleDistance() {
+        let best = Infinity;
+        for (const hole of holes) {
+          best = Math.min(best, ant.position.distanceTo(hole.position));
+        }
+        return best;
+      }
+
+      function nearMainTreeEntrance() {
+        if (!mainTree) return false;
+        const entranceX = mainTree.x;
+        const entranceZ = mainTree.z - mainTree.radius - 35;
+        return Math.hypot(ant.position.x - entranceX, ant.position.z - entranceZ) < 420;
+      }
+
+      function animate() {
+        const dt = Math.min(clock.getDelta(), 0.033);
+        const time = clock.elapsedTime;
+
+        if (running) {
+          if (hideCooldown > 0) hideCooldown -= dt;
+          if ((keys.has("e") || keys.has("enter")) && hideCooldown <= 0) {
+            const tree = nearestClimbableTree();
+            if (insideTree) {
+              insideTree = false;
+              climbingTree = null;
+              hideCooldown = 0.6;
+              ant.position.set(mainTree.x, groundInfoAt(mainTree.x, mainTree.z - mainTree.radius - 420).height + 24, mainTree.z - mainTree.radius - 420);
+              objectiveText.textContent = "Saiu da árvore. Explore o quintal gigante";
+            } else if (!climbingTree && nearMainTreeEntrance() && !hiddenInHole) {
+              insideTree = true;
+              climbingTree = mainTree;
+              climbAngle = -Math.PI / 2;
+              climbHeight = 260 * mainTree.scale;
+              velocity.set(0, 0, 0);
+              hideCooldown = 0.6;
+              objectiveText.textContent = "Dentro da árvore: colete 5 cristais de seiva no caminho interno";
+            } else if (climbingTree) {
+              const exitX = climbingTree.x + Math.sin(climbAngle) * (climbingTree.radius + 45);
+              const exitZ = climbingTree.z + Math.cos(climbAngle) * (climbingTree.radius + 45);
+              ant.position.set(exitX, groundInfoAt(exitX, exitZ).height + 24, exitZ);
+              climbingTree = null;
+              hideCooldown = 0.6;
+              objectiveText.textContent = foodCount >= 12 ? "Volte ao formigueiro no ponto escuro ao norte" : "Colete 12 migalhas. Use E perto de buracos para se esconder";
+            } else if (tree && !hiddenInHole) {
+              climbingTree = tree;
+              climbAngle = Math.atan2(ant.position.x - tree.x, ant.position.z - tree.z);
+              climbHeight = Math.max(32, ant.position.y - groundInfoAt(tree.x, tree.z).height);
+              velocity.set(0, 0, 0);
+              hideCooldown = 0.6;
+              objectiveText.textContent = "Escalando árvore. W/S sobe e desce, A/D contorna o tronco, E solta";
+            } else if (hiddenInHole) {
+              hiddenInHole = false;
+              hideCooldown = 0.6;
+              ant.visible = true;
+              objectiveText.textContent = foodCount >= 12 ? "Volte ao formigueiro no ponto escuro ao norte" : "Colete 12 migalhas. Use E perto de buracos para se esconder";
+            } else if (nearestHoleDistance() < 135) {
+              hiddenInHole = true;
+              hideCooldown = 0.6;
+              velocity.set(0, 0, 0);
+              ant.visible = false;
+              objectiveText.textContent = "Escondido. Pressione E para sair quando estiver seguro";
+            }
+          }
+
+          const turn = (keys.has("a") || keys.has("arrowleft") ? 1 : 0) - (keys.has("d") || keys.has("arrowright") ? 1 : 0);
+          const throttle = (keys.has("w") || keys.has("arrowup") ? 1 : 0) - (keys.has("s") || keys.has("arrowdown") ? 1 : 0);
+          const wantsRun = keys.has("shift") || keys.has("shiftleft") || keys.has("shiftright");
+          const canRun = wantsRun && throttle > 0 && !exhausted && stamina > 0;
+          const speed = canRun ? 380 : 220;
+          const modelMotion = Math.min(1, velocity.length() / 280);
+          for (const uniforms of antMotionUniforms) {
+            uniforms.uAntTime.value = time;
+            uniforms.uAntMove.value = modelMotion;
+          }
+
+          if (canRun) {
+            stamina -= 10 * dt;
+            if (stamina <= 0) {
+              stamina = 0;
+              exhausted = true;
+              restHintTimer = 2.4;
+              objectiveText.textContent = "A formiga cansou. Pare um pouco para recuperar o fôlego";
+            }
+          } else {
+            const recovering = Math.abs(throttle) < 0.1 ? 18 : 7;
+            stamina = Math.min(100, stamina + recovering * dt);
+            if (exhausted && stamina >= 38) {
+              exhausted = false;
+              objectiveText.textContent = foodCount >= 12 ? "Volte ao formigueiro no ponto escuro ao norte" : "Explore o quintal gigante e colete 12 migalhas";
+            }
+          }
+
+          if (restHintTimer > 0) {
+            restHintTimer -= dt;
+          }
+
+          const webSlow = webs.some((web) => ant.position.distanceTo(web.position) < web.radius) ? 0.42 : 1;
+          if (webSlow < 1 && !hiddenInHole && restHintTimer <= 0) objectiveText.textContent = "Teia de aranha. Saia dela para recuperar velocidade";
+
+          if (climbingTree) {
+            climbAngle += turn * dt * (insideTree ? 1.15 : 1.7);
+            climbHeight = THREE.MathUtils.clamp(climbHeight + throttle * dt * (canRun ? 280 : 160), insideTree ? 220 * climbingTree.scale : 32, climbingTree.height);
+            const climbRadius = insideTree ? climbingTree.innerRadius : climbingTree.radius + 18;
+            ant.position.x = climbingTree.x + Math.sin(climbAngle) * climbRadius;
+            ant.position.z = climbingTree.z + Math.cos(climbAngle) * climbRadius;
+            ant.position.y = groundInfoAt(climbingTree.x, climbingTree.z).height + climbHeight;
+            antHeading = climbAngle + Math.PI;
+            ant.rotation.y = antHeading;
+            ant.rotation.x = insideTree ? -0.42 : -Math.PI / 2.9;
+            velocity.set(0, throttle * 160, 0);
+          } else {
+            ant.rotation.x = 0;
+            antHeading += hiddenInHole ? 0 : turn * dt * 2.55;
+            ant.rotation.y = antHeading;
+
+            if (throttle !== 0 && !hiddenInHole) {
+              const currentGround = terrainHeightAt(ant.position.x, ant.position.z);
+              const nextX = ant.position.x + Math.sin(antHeading) * 72;
+              const nextZ = ant.position.z + Math.cos(antHeading) * 72;
+              const slope = Math.abs(terrainHeightAt(nextX, nextZ) - currentGround) / 72;
+              const slopeSlow = THREE.MathUtils.clamp(1 - slope * 0.42, 0.34, 1);
+              desired.set(Math.sin(antHeading), 0, Math.cos(antHeading)).multiplyScalar(speed * throttle * webSlow * slopeSlow);
+              velocity.lerp(desired, 0.12);
+            } else {
+              velocity.lerp(new THREE.Vector3(), 0.1);
+            }
+
+            const prevX = ant.position.x;
+            const prevZ = ant.position.z;
+            const prevGround = groundInfoAt(prevX, prevZ).height;
+            ant.position.addScaledVector(velocity, dt);
+            const info = groundInfoAt(ant.position.x, ant.position.z);
+            const ground = info.height;
+            const horizontalStep = Math.max(1, Math.hypot(ant.position.x - prevX, ant.position.z - prevZ));
+            const slopeStep = Math.abs(ground - prevGround) / horizontalStep;
+            const treeCollision = collidesWithTree(ant.position.x, ant.position.z);
+            if (treeCollision || slopeStep > 1.25) {
+              ant.position.x = prevX;
+              ant.position.z = prevZ;
+              velocity.multiplyScalar(0.12);
+              if (treeCollision) {
+                objectiveText.textContent = "Tronco bloqueando. Pressione E perto da árvore para escalar";
+              } else {
+                objectiveText.textContent = "Morro muito íngreme. Procure uma subida mais suave";
+              }
+            }
+            const finalInfo = groundInfoAt(ant.position.x, ant.position.z);
+            ant.position.y = finalInfo.height + 24 + Math.sin(time * 11) * Math.min(1.2, velocity.length() / 220);
+            const tiltForward = THREE.MathUtils.clamp((1 - finalInfo.normal.y) * 0.85, 0, 0.32);
+            ant.rotation.z = THREE.MathUtils.lerp(ant.rotation.z, -Math.sin(antHeading) * tiltForward, 0.08);
+            ant.position.x = THREE.MathUtils.clamp(ant.position.x, -HALF + 800, HALF - 800);
+            ant.position.z = THREE.MathUtils.clamp(ant.position.z, -HALF + 800, HALF - 800);
+          }
+
+          if (climbingTree) {
+            objectiveText.textContent = insideTree ? `Dentro da árvore: seiva ${treeMissionCount}/5. W/S avança, A/D contorna, E sai` : "Escalando árvore. W/S sobe e desce, A/D contorna o tronco, E solta";
+          } else {
+            const nearbyTree = nearestClimbableTree();
+            if (nearMainTreeEntrance() && restHintTimer <= 0 && !hiddenInHole) {
+              objectiveText.textContent = "Entrada da árvore enorme. Pressione E para entrar";
+            } else if (nearbyTree && restHintTimer <= 0 && !hiddenInHole) {
+              objectiveText.textContent = "Perto de árvore escalável. Pressione E para subir";
+            }
+          }
+
+          if (ant.realModel) {
+            const motion = Math.min(1, velocity.length() / 280);
+            const baseRotation = ant.realModel.userData.baseRotation;
+            const baseScale = ant.realModel.userData.baseScale;
+            ant.realModel.rotation.x = baseRotation.x + Math.sin(time * 5.5) * motion * 0.025;
+            ant.realModel.rotation.y = baseRotation.y;
+            ant.realModel.rotation.z = baseRotation.z + Math.sin(time * 8) * motion * 0.035;
+            ant.realModel.scale.set(
+              baseScale.x,
+              baseScale.y * (1 + Math.sin(time * 10) * motion * 0.018),
+              baseScale.z
+            );
+          }
+          for (const leg of ant.legs) {
+            const strideRate = canRun ? 18 : 13;
+            leg.rotation.z = leg.userData.side * (0.08 + Math.sin(time * strideRate + leg.userData.phase) * Math.min(0.42, velocity.length() / 560));
+            leg.rotation.x = Math.sin(time * (canRun ? 13 : 9) + leg.userData.phase) * Math.min(0.22, velocity.length() / 900);
+          }
+
+          if (false && ant.realLegRig.visible) {
+            const strideRate = canRun ? 21 : 15;
+            const stride = Math.min(1, velocity.length() / 320);
+            for (const leg of ant.realLegs) {
+              const wave = Math.sin(time * strideRate + leg.userData.phase);
+              const lift = Math.max(0, wave) * stride;
+              const push = Math.sin(time * strideRate + leg.userData.phase + Math.PI / 2) * stride;
+              leg.rotation.x = push * 0.28;
+              leg.rotation.z = leg.userData.side * push * 0.18;
+              leg.position.y = leg.userData.baseY + lift * 6.5;
+              leg.position.z = leg.userData.baseZ + push * 9;
+              leg.userData.upper.rotation.x = 0.22 + lift * 0.42;
+              leg.userData.upper.rotation.z = leg.userData.side * (1.08 + push * 0.2);
+              leg.userData.lower.rotation.x = -0.15 - lift * 0.35;
+              leg.userData.lower.rotation.z = leg.userData.side * (0.82 - push * 0.18);
+              leg.userData.foot.position.y = -61 + lift * 4;
+            }
+          }
+
+          const toAnt = new THREE.Vector3().subVectors(ant.position, spider.position);
+          const dist = toAnt.length();
+          if (!hiddenInHole && !climbingTree && dist < 950 && dist > 2) {
+            toAnt.normalize();
+            spider.position.addScaledVector(toAnt, dt * (canRun ? 112 : 92));
+            spider.rotation.y = Math.atan2(toAnt.x, toAnt.z);
+          }
+          if (!hiddenInHole && !climbingTree && dist < 80) {
+            health -= 22 * dt;
+            if (health <= 0) finish(false);
+          }
+
+          for (const bird of birds) {
+            const data = bird.userData;
+            const a = time * data.speed + data.phase;
+            bird.position.set(
+              data.center.x + Math.cos(a) * data.radius,
+              data.center.y + Math.sin(a * 1.7) * 85,
+              data.center.z + Math.sin(a) * data.radius
+            );
+            bird.rotation.y = -a + Math.PI / 2;
+            const flap = Math.sin(time * 8 + data.phase) * 0.55;
+            data.left.rotation.x = flap;
+            data.right.rotation.x = -flap;
+            data.strikeCooldown -= dt;
+
+            const horizontal = Math.hypot(bird.position.x - ant.position.x, bird.position.z - ant.position.z);
+            if (!hiddenInHole && !climbingTree && horizontal < 210 && bird.position.y < 690 && data.strikeCooldown <= 0) {
+              health -= 28;
+              stamina = Math.max(0, stamina - 18);
+              data.strikeCooldown = 4.5;
+              objectiveText.textContent = "Pássaro atacou. Corra para um buraco e pressione E";
+              if (health <= 0) finish(false);
+            }
+          }
+
+          for (const bird of skyBirds) {
+            const data = bird.userData;
+            const a = time * data.speed + data.phase;
+            bird.position.set(
+              data.center.x + Math.cos(a) * data.radiusX,
+              data.center.y + Math.sin(a * 1.8) * 120,
+              data.center.z + Math.sin(a) * data.radiusZ
+            );
+            bird.rotation.y = -a + Math.PI / 2;
+            bird.rotation.z = Math.sin(time * 0.7 + data.phase) * 0.08;
+            const flap = Math.sin(time * 9.5 + data.phase) * 0.72;
+            data.leftWing.rotation.x = flap;
+            data.rightWing.rotation.x = -flap;
+            data.leftWing.rotation.z = -0.18 + Math.abs(flap) * 0.2;
+            data.rightWing.rotation.z = 0.18 - Math.abs(flap) * 0.2;
+          }
+
+          for (const crumb of food) {
+            if (crumb.userData.collected) continue;
+            crumb.rotation.y += dt * 1.8;
+            crumb.position.y = 15 + Math.sin(time * 2.5 + crumb.position.x) * 4;
+            if (crumb.position.distanceTo(ant.position) < 70) {
+              crumb.userData.collected = true;
+              crumb.visible = false;
+              foodCount += 1;
+              if (foodCount >= 12) objectiveText.textContent = "Volte ao formigueiro no ponto escuro ao norte";
+            }
+          }
+
+          if (insideTree) {
+            for (const item of treeMissionItems) {
+              if (item.collected) continue;
+              item.mesh.getWorldPosition(item.world);
+              item.mesh.rotation.y += dt * 1.8;
+              if (item.world.distanceTo(ant.position) < 170) {
+                item.collected = true;
+                item.mesh.visible = false;
+                treeMissionCount += 1;
+                objectiveText.textContent = treeMissionCount >= 5 ? "Missão da árvore completa. Pressione E para sair" : `Dentro da árvore: seiva ${treeMissionCount}/5`;
+              }
+            }
+          }
+
+          if (foodCount >= 12 && ant.position.distanceTo(home.position) < 120) {
+            finish(true);
+          }
+
+          updateHud();
+        }
+
+        for (const mote of motes) {
+          mote.position.y = mote.userData.baseY + Math.sin(time * 1.7 + mote.userData.phase) * 28;
+          mote.rotation.y += dt;
+        }
+
+        for (let i = 0; i < surrealObjects.length; i++) {
+          surrealObjects[i].rotation.y = Math.sin(time * 0.22 + i) * 0.035;
+        }
+
+        const forward = new THREE.Vector3(Math.sin(antHeading), 0, Math.cos(antHeading));
+        const bob = Math.sin(time * (velocity.length() > 260 ? 10 : 7)) * Math.min(12, velocity.length() * 0.025);
+        camTarget.copy(ant.position).add(new THREE.Vector3(0, climbingTree ? 80 : 34 + bob * 0.2, 0));
+        camPos.copy(ant.position).addScaledVector(forward, climbingTree ? -520 : velocity.length() > 260 ? -300 : -245).add(new THREE.Vector3(0, climbingTree ? 260 : 88 + bob, climbingTree ? 140 : 42));
+        camera.position.lerp(camPos, 0.075);
+        camera.lookAt(camTarget);
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+
+      addEventListener("resize", () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+
+      addEventListener("keydown", (event) => keys.add(event.key.toLowerCase()));
+      addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
+      document.getElementById("startButton").addEventListener("click", resetGame);
+      document.getElementById("restartButton").addEventListener("click", resetGame);
+
+      for (const button of document.querySelectorAll(".control-button")) {
+        const key = button.dataset.key;
+        const press = (event) => {
+          event.preventDefault();
+          keys.add(key);
+          button.classList.add("active");
+        };
+        const release = (event) => {
+          event.preventDefault();
+          keys.delete(key);
+          button.classList.remove("active");
+        };
+        button.addEventListener("pointerdown", press);
+        button.addEventListener("pointerup", release);
+        button.addEventListener("pointerleave", release);
+        button.addEventListener("pointercancel", release);
+      }
+
+      animate();
+    </script>
+  </body>
+</html>
