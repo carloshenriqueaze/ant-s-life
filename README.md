@@ -2,6 +2,14 @@
 
 Jogo web 3D em que o jogador controla uma formiga em um quintal gigante.
 
+## Estrutura limpa
+
+- `index.html`: versao principal para GitHub Pages
+- `JOGAR_3D.html`: versao local do mesmo jogo
+- `assets/formiga_nova/`: modelo 3D real da formiga
+- `servidor_3d.js`: servidor local simples
+- `JOGAR_3D.bat`: abre o jogo no Windows
+
 ## Jogar localmente
 
 Abra:
