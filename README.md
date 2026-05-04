@@ -37,7 +37,7 @@ O arquivo `index.html` ja esta pronto para GitHub Pages usando Three.js via CDN.
 Depois de ativar Pages no repositorio, a pagina fica em:
 
 ```text
-https://carloshenriqueaze.github.io/vida-de-formiga/
+https://carloshenriqueaze.github.io/ant-s-life/
 ```
 
 ## Controles
